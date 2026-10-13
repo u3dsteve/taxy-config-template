@@ -1,0 +1,15 @@
+services:
+  taxy:
+    image: ghcr.io/picohz/taxy:latest
+    container_name: taxy
+    restart: always
+    volumes:
+      - $PWD/taxy-config:/root/.config/taxy
+    ports:
+      - "46492:46492/tcp"
+    # Add new forwarded port to here.
+    deploy:
+      resources:
+        limits:
+          memory: 512MB
+          cpus: "1.0"
