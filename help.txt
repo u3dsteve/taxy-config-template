@@ -1,0 +1,147 @@
+============================================================
+ Taxy Admin Cheatsheet (Taxy Operations Only)
+============================================================
+Taxy WebUI: http://ip:46492/
+(Adjust the IP/port to match your actual bind address.)
+
+------------------------------------------------------------
+ 1. USER MANAGEMENT (CLI)
+------------------------------------------------------------
+Taxy users are managed exclusively via the CLI inside the container.
+
+Show all available Taxy CLI commands:
+  taxy --help
+
+Create a new user:
+  taxy add-user <username>
+
+Example:
+  taxy add-user admin
+You will be prompted to enter and confirm a password.
+
+If you need to change a user's password:
+  - Check whether a password-reset subcommand exists:
+      taxy --help
+  - If no direct command exists, remove and re-add the user
+    (only if remove-user is supported):
+      taxy remove-user <username>
+      taxy add-user <username>
+
+List users (if supported by your version):
+  taxy list-users
+
+Note: The CLI may have a separate `user` subcommand group in newer versions.
+Check `taxy --help` for the exact syntax.
+
+------------------------------------------------------------
+ 2. CONFIGURATION STORAGE
+------------------------------------------------------------
+Taxy stores all persistent data in:
+  /root/.config/taxy
+
+This directory contains:
+  - User accounts
+  - Proxy rules (TCP / UDP / HTTP / TLS / WebSocket)
+  - TLS certificates (imported or self-signed)
+  - Let's Encrypt (ACME) state
+  - Any other persistent configuration
+
+If you mounted this directory from the host (e.g., ./taxy-config),
+you can back it up directly from the host:
+  tar czf taxy-config-backup-$(date +%F).tar.gz taxy-config
+
+To restore:
+  tar xzf taxy-config-backup-YYYY-MM-DD.tar.gz
+
+------------------------------------------------------------
+ 3. PROXY RULES (TCP / UDP / HTTP / TLS / WebSocket)
+------------------------------------------------------------
+Taxy supports live configuration updates via its WebUI and REST API,
+so you do NOT need to restart the service when adding or changing rules.
+
+To create a TCP or UDP forwarding rule in the WebUI:
+  1. Open the Taxy admin panel.
+  2. Go to the Proxies / Rules section.
+  3. Click "Add" or "Create".
+  4. Set:
+       Protocol   : TCP or UDP
+       Listen Port: the port Taxy listens on inside the container
+       Upstream   : target IP:port (e.g., 192.168.1.100:51820)
+  5. Save. The rule takes effect immediately.
+
+Important: The Listen Port in the WebUI must match the
+container port mapped in your docker-compose.yml. For example:
+  ports:
+    - "51820:51820/udp"
+  → Listen Port in WebUI = 51820
+
+Taxy also supports:
+  - TLS termination
+  - HTTP/HTTPS reverse proxy
+  - WebSocket upgrading
+  - HTTP/2 and partial HTTP/3 (incoming QUIC only)
+
+------------------------------------------------------------
+ 4. REST API (FOR AUTOMATION)
+------------------------------------------------------------
+Taxy exposes a REST API for programmatic configuration updates.
+
+API documentation (Swagger UI):
+  https://taxy.onrender.com/swagger-ui
+
+The API allows live configuration changes without restarting the
+service. Use this if you want to manage rules via scripts or
+external tools.
+
+------------------------------------------------------------
+ 5. TLS CERTIFICATES
+------------------------------------------------------------
+Taxy can manage TLS certificates in two ways:
+
+  1. Import from WebUI:
+     Upload an existing certificate and private key directly.
+
+  2. Generate self-signed certificate:
+     Create a self-signed cert via the WebUI for testing.
+
+  3. Let's Encrypt (ACME v2):
+     Taxy supports automatic certificate provisioning via
+     Let's Encrypt using the HTTP challenge method.
+     Configure your domain in the WebUI and enable ACME.
+
+All certificate data is stored in /root/.config/taxy.
+
+------------------------------------------------------------
+ 6. TROUBLESHOOTING (TAXY-SPECIFIC)
+------------------------------------------------------------
+WebUI not reachable?
+  - Verify the admin panel port is mapped in docker-compose.yml.
+  - Check that the bind IP (e.g., 100.64.0.1) is reachable from
+    your network (Tailscale, LAN, etc.).
+  - Confirm the container is running.
+
+Forgot admin password?
+  - Check `taxy --help` for a password reset command.
+  - If none exists, restore from a backup of /root/.config/taxy.
+  - As a last resort, if remove-user is supported:
+      taxy remove-user <username>
+      taxy add-user <username>
+
+UDP forwarding not working?
+  - Verify the UDP port is mapped in docker-compose.yml.
+  - Verify the WebUI rule protocol is set to UDP.
+  - Check upstream reachability from inside the container:
+      nc -zvu <upstream-ip> <upstream-port>
+
+Proxy rule changes not applying?
+  - Taxy supports live updates; no restart needed.
+  - If the WebUI shows the rule but traffic doesn't pass,
+    check that the Listen Port matches the mapped container port.
+  - Verify firewall rules on the host.
+
+------------------------------------------------------------
+ 7. VERSION NOTICE
+------------------------------------------------------------
+Taxy is in early development. Breaking changes may occur between
+minor versions (e.g., 0.3.x → 0.4.x). Always check the release
+notes before upgrading.
